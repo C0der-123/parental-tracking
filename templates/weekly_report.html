@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Weekly Report</title>
+</head>
+<body>
+    <h1>Weekly Distance Crossing Report</h1>
+    {% if alerts %}
+        <ul>
+            {% for alert in alerts %}
+                <li>{{ alert.timestamp }} - {{ alert.distance }} km</li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p>No alerts this week!</p>
+    {% endif %}
+
+    <br>
+    <a href="/dashboard">Back to Dashboard</a>
+</body>
+</html>

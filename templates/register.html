@@ -1,0 +1,18 @@
+
+<!-- register.html (Registration Page) -->
+{% extends 'base.html' %}
+{% block title %}Register{% endblock %}
+{% block content %}
+    <h2>Register</h2>
+    <form method="POST" action="/register">
+        <label>Username: <input type="text" name="username" required></label><br>
+        <label>Password: <input type="password" name="password" required></label><br>
+        <label>Role: 
+            <select name="role" required>
+                <option value="parent">Parent</option>
+                <option value="child">Child</option>
+            </select>
+        </label><br>
+        <button type="submit">Register</button>
+    </form>
+{% endblock %}

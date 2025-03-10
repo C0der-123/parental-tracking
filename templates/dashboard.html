@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>Dashboard</title>
+    <link rel="stylesheet" href="/static/style.css">
+
+    <!-- OpenStreetMap (Leaflet) Library -->
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css">
+</head>
+
+<body>
+    <h1>Welcome, {{ user.username }}</h1>
+
+    {% if user.role == 'parent' %}
+    <h2>Link a Child:</h2>
+    <form action="/link-child" method="POST">
+        <label for="child_username">Child Username:</label>
+        <input type="text" id="child_username" name="child_username" required>
+        <button type="submit">Link Child</button>
+    </form>
+    <br>
+
+    <h2>Your Linked Children:</h2>
+    {% if children %}
+        {% for child in children %}
+            <p>{{ child.username }} - Location: {{ child.latitude }}, {{ child.longitude }}</p>
+
+            <!-- Map Container -->
+            <div id="map-{{ child.id }}" style="height: 300px; width: 100%;"></div>
+
+            <p>Safe Zone Data:</p>
+            <ul>
+                <li>Latitude: {{ child.safe_latitude }}</li>
+                <li>Longitude: {{ child.safe_longitude }}</li>
+                <li>Radius: {{ child.safe_radius }}</li>
+            </ul>
+
+            <!-- Safe Zone Form -->
+            <form id="safe-zone-form-{{ child.id }}" action="/set_safe_zone" method="POST">
+                <input type="hidden" name="child_id" value="{{ child.id }}">
+                <input type="hidden" id="latitude-{{ child.id }}" name="latitude">
+                <input type="hidden" id="longitude-{{ child.id }}" name="longitude">
+                <label>Safe Zone Radius (meters): <input type="number" name="radius" required></label>
+                <button type="submit">Set Safe Zone</button>
+            </form>
+
+            <!-- Display distance from safe zone -->
+            {% if child.distance_from_safe_zone is not none %}
+                <p>Distance from Safe Spot: {{ "%.2f"|format(child.distance_from_safe_zone) }} meters</p>
+            {% else %}
+                <p>Distance from Safe Spot: Not available</p>
+            {% endif %}
+
+
+            <!-- Unlink Child Form -->
+            <form action="/unlink_child" method="POST">
+                <input type="hidden" name="child_id" value="{{ child.id }}">
+                <button type="submit">Unlink {{ child.username }}</button>
+            </form>
+
+        {% endfor %}
+
+    {% else %}
+        <p>No children linked yet.</p>
+    {% endif %}
+    <h2>Recent Alerts</h2>
+    {% if alerts %}
+        <ul>
+            {% for alert in alerts %}
+                <li>
+                    🚨 Child name: {{ alert.child_name }} - 
+                    {{ alert.distance|round(2) }}m outside the safe zone ({{ alert.timestamp.strftime('%Y-%m-%d %H:%M:%S') }})
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p>No alerts yet.</p>
+    {% endif %}
+    {% endif %}
+
+    {% if user.role == 'child' %}
+        <h2>Your Parent:</h2>
+        {% if parent %}
+            <p>{{ parent.username }}</p>
+        {% else %}
+            <p>No parent linked yet.</p>
+        {% endif %}
+        <!-- Map Container for Child -->
+        <div id="map-child" style="height: 300px; width: 100%;"></div>
+    {% endif %}
+
+    <br>
+    <a href="/logout">Logout</a>
+</body>
+<script>
+    window.onload = function () {
+        function setSafeZone(childId, lat, lng) {
+            const latInput = document.getElementById(`latitude-${childId}`);
+            const lngInput = document.getElementById(`longitude-${childId}`);
+
+            if (latInput && lngInput) {
+                latInput.value = lat;
+                lngInput.value = lng;
+                console.log(`✅ Safe Zone Updated for Child ${childId}: ${lat}, ${lng}`);
+            } else {
+                console.error(`❌ Inputs not found for childId: ${childId}`);
+            }
+        }
+
+        {% for child in children %}
+        //set the safe zone
+        (function(childId, lat, lng, username, safeLat, safeLng, safeRadius) {
+            console.log(`🔍 Initializing map for child ${childId}`);
+
+            const mapContainer = document.getElementById(`map-${childId}`);
+            if (!mapContainer) {
+                console.error(`❌ Map container missing for childId: ${childId}`);
+                return;
+            }
+
+            if (!lat || !lng) {
+                console.error(`❌ Invalid coordinates for childId: ${childId}`, lat, lng);
+                return;
+            }
+
+            const map = L.map(mapContainer).setView([lat, lng], 15);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+
+            L.marker([lat, lng]).addTo(map)
+                .bindPopup(username + "'s Location")
+                .openPopup();
+
+                let currentSafeZone = null;
+
+                // Function to draw or update the safe zone
+                function updateSafeZone(lat, lng, radius) {
+                    if (currentSafeZone) {
+                        map.removeLayer(currentSafeZone); // Remove previous safe zone
+                    }
+        
+                    currentSafeZone = L.circle([lat, lng], {
+                        color: 'blue',
+                        fillColor: '#add8e6',
+                        fillOpacity: 0.3,
+                        radius: radius
+                    }).addTo(map).bindPopup('Safe Zone for ' + username);
+        
+                    setSafeZone(childId, lat, lng);
+                }
+        
+                // Initialize existing safe zone (if present)
+                if (safeLat !== null && safeLng !== null && safeRadius) {
+                    updateSafeZone(safeLat, safeLng, safeRadius);
+                }
+        
+                // Allow clicking to set a new safe zone
+                map.on('click', function (e) {
+                    const clickedLat = e.latlng.lat;
+                    const clickedLng = e.latlng.lng;
+                    console.log(`🟢 Clicked Coordinates for child ${childId}:`, clickedLat, clickedLng);
+                    
+                    // Update the safe zone with the new position
+                    updateSafeZone(clickedLat, clickedLng, safeRadius || 100); // Default to 100m if not set
+        
+                    alert(`Safe zone set at: ${clickedLat}, ${clickedLng}`);
+                });
+            // Ensure lat/lng inputs are filled on form submission
+            const form = document.getElementById(`safe-zone-form-${childId}`);
+            form.addEventListener('submit', function (event) {
+                const latInput = document.getElementById(`latitude-${childId}`);
+                const lngInput = document.getElementById(`longitude-${childId}`);
+
+                console.log(`🔍 Form Submission for child ${childId}:`, latInput.value, lngInput.value);
+
+                if (!latInput.value || !lngInput.value) {
+                    alert('❗ Please click on the map to set a safe zone location.');
+                    event.preventDefault();
+                }
+            });
+            
+        })
+        (
+            {{ child.id }},
+            {{ child.latitude or 0 }},
+            {{ child.longitude or 0 }},
+            "{{ child.username }}",
+            {{ child.safe_latitude if child.safe_latitude is not none else 'null' }},
+            {{ child.safe_longitude if child.safe_longitude is not none else 'null' }},
+            {{ child.safe_radius or 'null' }}
+        );
+        {% endfor %}
+        //show map on child dashboard
+        {% if user.role == 'child' and child_data %}
+        (function(lat, lng, safeLat, safeLng, safeRadius) {
+        console.log("📍 Initializing child map", lat, lng, safeLat, safeLng, safeRadius);
+
+        const mapContainer = document.getElementById("map-child");
+
+            if (mapContainer && lat && lng) {
+                const map = L.map(mapContainer).setView([lat, lng], 15);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(map);
+                L.marker([lat, lng]).addTo(map).bindPopup("Your Location").openPopup();
+
+                // ✅ Draw the Safe Zone Circle
+                if (safeLat !== null && safeLng !== null && safeRadius) {
+                    L.circle([safeLat, safeLng], {
+                        color: 'green',
+                        fillColor: '#90ee90',
+                        fillOpacity: 0.3,
+                        radius: safeRadius
+                    }).addTo(map).bindPopup("Your Safe Zone");
+                }
+            }
+        })(
+            {{ child_data.latitude or 0 }},
+            {{ child_data.longitude or 0 }},
+            {{ child_data.safe_latitude or 'null' }},
+            {{ child_data.safe_longitude or 'null' }},
+            {{ child_data.safe_radius or 'null' }}
+        );
+        {% endif %}
+
+        //show safe zone on child dashboard
+        
+    };
+    // Function to get and send child's location
+    function sendLocation() {
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(function (position) {
+                const latitude = position.coords.latitude;
+                const longitude = position.coords.longitude;
+
+                // Send to Flask via AJAX
+                fetch('/update-location', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ latitude, longitude })
+                });
+            });
+        } else {
+            alert("Geolocation is not supported by this browser.");
+        }
+    }
+
+    // Update location every 30 seconds
+    setInterval(sendLocation, 5000);
+    sendLocation();
+    // Fetch and update alerts dynamically
+    function fetchAlerts() {
+        fetch('/get_alerts')
+            .then(response => response.json())
+            .then(data => {
+                const alertContainer = document.getElementById('alert-list');
+
+                if (alertContainer && data.alerts) {
+                    alertContainer.innerHTML = '';
+
+                    if (data.alerts.length === 0) {
+                        alertContainer.innerHTML = '<p>No alerts yet.</p>';
+                    } else {
+                        data.alerts.forEach(alert => {
+                            const alertItem = document.createElement('li');
+                            alertItem.textContent = `🚨 Child: ${alert.child_name} - ${alert.distance}m outside the safe zone (${alert.timestamp})`;
+                            alertContainer.appendChild(alertItem);
+                        });
+                    }
+                }
+            })
+            .catch(error => console.error('Error fetching alerts:', error));
+    }
+
+    // Refresh alerts every 10 seconds
+    setInterval(fetchAlerts, 10000);
+    fetchAlerts();
+
+</script>
+</html>
