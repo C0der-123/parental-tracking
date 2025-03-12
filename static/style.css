@@ -91,3 +91,57 @@ button:hover {
       margin: 0.5rem 0;
   }
 }
+/* Form design */
+/* Compact safe-zone form */
+.form {
+  max-width: 400px; /* Restrict form width */
+  margin: 10px auto; /* Center the form */
+  padding: 10px;
+  border: 1px solid #ccc; /* Light border */
+  border-radius: 8px; /* Rounded corners */
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1); /* Soft shadow */
+  display: flex; /* Use flexbox for better control */
+  flex-direction: column; /* Stack items vertically */
+  gap: 8px; /* Add space between items */
+}
+
+/* Label styling */
+.form label {
+  display: flex; /* Align label and input inline */
+  align-items: center; /* Vertically align items */
+  gap: 8px; /* Space between label and input */
+}
+
+/* Limit input width */
+.form input {
+  width: 200px; /* Set a fixed width */
+  padding: 5px;
+}
+
+/* Button styling */
+.form button {
+  display: inline-block; /* Prevents full width */
+  padding: 12px 24px;
+  font-size: 16px;
+  color: white;
+  background: linear-gradient(145deg, #4CAF50, #45a049); /* Green gradient */
+  border: none;
+  border-radius: 8px; /* Rounded corners */
+  box-shadow: 0 8px 0 #357a38; /* 3D shadow */
+  cursor: pointer;
+  transition: all 0.2s ease;
+
+}
+
+
+.form button:hover {
+  transform: translateY(-3px); /* Move up slightly */
+    box-shadow: 0 10px 0 #357a38; /* Deeper shadow */
+}
+.form button:active {
+  transform: translateY(4px); /* Move down */
+    box-shadow: 0 4px 0 #357a38; /* Smaller shadow */
+}
+
+
+

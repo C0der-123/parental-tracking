@@ -94,31 +94,26 @@ def dashboard():
 
     user = User.query.get(session['user_id'])
 
-    # If user is a parent, fetch linked children and calculate distances
     if user.role == 'parent':
         children = user.children
 
-        # Calculate distance from safe zone for each child (if set)
         for child in children:
             if child.latitude and child.longitude and child.safe_latitude and child.safe_longitude:
                 safe_zone_coords = (child.safe_latitude, child.safe_longitude)
                 child_coords = (child.latitude, child.longitude)
-
                 child.distance_from_safe_zone = geodesic(safe_zone_coords, child_coords).meters
             else:
                 child.distance_from_safe_zone = None
-        
-        # ✅ Ensure alerts are fetched once (not inside loop)
+
         alerts = Alert.query.filter_by(parent_id=user.id).order_by(Alert.timestamp.desc()).limit(10).all()
+
         for alert in alerts:
-            child = User.query.get(alert.child_id)  # Assuming User model for child
+            child = User.query.get(alert.child_id)
             alert.child_name = child.username if child else "Unknown Child"
 
         return render_template('dashboard.html', user=user, children=children, alerts=alerts)
 
-    # If user is a child, show parent information
     elif user.role == 'child':
-        parent = user.parent
         parent = user.parent
         child_data = {
             'latitude': user.latitude,
@@ -127,8 +122,8 @@ def dashboard():
             'safe_longitude': user.safe_longitude,
             'safe_radius': user.safe_radius
         }
-        print("Child Safe Zone Data:", child_data)
         return render_template('dashboard.html', user=user, parent=parent, child_data=child_data)
+
     return redirect(url_for('login'))
 
 # Logout Route
@@ -236,26 +231,30 @@ def set_distance_limit():
     return redirect(url_for('dashboard'))
 
 #weekly report
-@app.route('/weekly-report')
-def weekly_report():
+@app.route('/weekly-report/<int:child_id>')
+def child_weekly_report(child_id):
     if 'user_id' not in session:
         return redirect(url_for('login'))
 
     user = User.query.get(session['user_id'])
 
-    if user.role == 'parent':
-        # Get alerts from the past 7 days
-        week_ago = datetime.now(utc_plus_7) - timedelta(days=7)
-        alerts = Alert.query.filter(Alert.parent_id == user.id, Alert.timestamp >= week_ago).all()
-        return render_template('weekly_report.html', alerts=alerts)
+    # Ensure only parents can view the report
+    if user.role != 'parent':
+        return "Unauthorized", 403
 
-    elif user.role == 'child':
-        # Get child's own alerts
-        week_ago = datetime.now(utc_plus_7) - timedelta(days=7)
-        alerts = Alert.query.filter(Alert.child_id == user.id, Alert.timestamp >= week_ago).all()
-        return render_template('weekly_report.html', alerts=alerts)
+    # Validate that the child is linked to the parent
+    child = User.query.get(child_id)
+    if not child or child.parent_id != user.id:
+        return "Invalid child or not linked.", 400
 
-    return "Unauthorized", 403
+    # Get alerts from the past 7 days
+    week_ago = datetime.now(utc_plus_7) - timedelta(days=7)
+    alert_count = Alert.query.filter(
+        Alert.child_id == child_id,
+        Alert.timestamp >= week_ago
+    ).count()
+
+    return render_template('child_weekly_report.html', child=child, alert_count=alert_count)
 
 # set safe zone
 @app.route('/set_safe_zone', methods=['POST'])

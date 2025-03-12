@@ -1,0 +1,11 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Weekly Report - {{ child.username }}</title>
+</head>
+<body>
+    <h1>Weekly Report for {{ child.username }}</h1>
+    <p>Times Outside Safe Zone: {{ alert_count }}</p>
+    <a href="{{ url_for('dashboard') }}">Back to Dashboard</a>
+</body>
+</html>

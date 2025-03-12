@@ -3,11 +3,10 @@
 
 <head>
     <title>Dashboard</title>
-    <link rel="stylesheet" href="/static/style.css">
-
     <!-- OpenStreetMap (Leaflet) Library -->
     <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 
 <body>
@@ -15,7 +14,7 @@
 
     {% if user.role == 'parent' %}
     <h2>Link a Child:</h2>
-    <form action="/link-child" method="POST">
+    <form action="/link-child" method="POST" class="form">
         <label for="child_username">Child Username:</label>
         <input type="text" id="child_username" name="child_username" required>
         <button type="submit">Link Child</button>
@@ -25,10 +24,8 @@
     <h2>Your Linked Children:</h2>
     {% if children %}
         {% for child in children %}
-            <p>{{ child.username }} - Location: {{ child.latitude }}, {{ child.longitude }}</p>
-
             <!-- Map Container -->
-            <div id="map-{{ child.id }}" style="height: 300px; width: 100%;"></div>
+            <div id="map-{{ child.id }}" style="height: 80vh; width: 100vh;"></div>
 
             <p>Safe Zone Data:</p>
             <ul>
@@ -37,8 +34,16 @@
                 <li>Radius: {{ child.safe_radius }}</li>
             </ul>
 
+            <!-- Display distance from safe zone -->
+            {% if child.distance_from_safe_zone is not none %}
+                <p>Distance from Safe Spot: {{ "%.2f"|format(child.distance_from_safe_zone) }} meters</p>
+                <a href="{{ url_for('child_weekly_report', child_id=child.id) }}">View Weekly Report</a>
+            {% else %}
+                <p>Distance from Safe Spot: Not available</p>
+            {% endif %}
+            
             <!-- Safe Zone Form -->
-            <form id="safe-zone-form-{{ child.id }}" action="/set_safe_zone" method="POST">
+            <form id="safe-zone-form-{{ child.id }}" action="/set_safe_zone" method="POST" class="form">
                 <input type="hidden" name="child_id" value="{{ child.id }}">
                 <input type="hidden" id="latitude-{{ child.id }}" name="latitude">
                 <input type="hidden" id="longitude-{{ child.id }}" name="longitude">
@@ -46,16 +51,9 @@
                 <button type="submit">Set Safe Zone</button>
             </form>
 
-            <!-- Display distance from safe zone -->
-            {% if child.distance_from_safe_zone is not none %}
-                <p>Distance from Safe Spot: {{ "%.2f"|format(child.distance_from_safe_zone) }} meters</p>
-            {% else %}
-                <p>Distance from Safe Spot: Not available</p>
-            {% endif %}
-
 
             <!-- Unlink Child Form -->
-            <form action="/unlink_child" method="POST">
+            <form action="/unlink_child" method="POST" class="form">
                 <input type="hidden" name="child_id" value="{{ child.id }}">
                 <button type="submit">Unlink {{ child.username }}</button>
             </form>
@@ -70,8 +68,8 @@
         <ul>
             {% for alert in alerts %}
                 <li>
-                    🚨 Child name: {{ alert.child_name }} - 
-                    {{ alert.distance|round(2) }}m outside the safe zone ({{ alert.timestamp.strftime('%Y-%m-%d %H:%M:%S') }})
+                      {{ alert.child_name }} - 
+                    {{ alert.distance|round(2) }}m ({{ alert.timestamp.strftime('%Y-%m-%d %H:%M:%S') }})
                 </li>
             {% endfor %}
         </ul>
@@ -245,7 +243,7 @@
     }
 
     // Update location every 30 seconds
-    setInterval(sendLocation, 5000);
+    setInterval(sendLocation, 10000);
     sendLocation();
     // Fetch and update alerts dynamically
     function fetchAlerts() {
